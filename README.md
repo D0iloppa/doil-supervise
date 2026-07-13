@@ -5,6 +5,9 @@
 (terminology grounding) → 하위 과업별 **모델 라우팅**(근거 제시) → 분석·구현을
 **서브에이전트에 위임** → 결과 종합·보고. supervisor-worker 멀티에이전트 패턴.
 
+위임 전 저장소 루트에 `TASK_CONTEXT.md` 를 써 두고 워커가 끝날 때마다 갱신해, 세션이 끊겨도
+다음 세션이 이어갈 수 있게 한다. 하위과업의 검증 조건은 `/goal` 로 감독 세션에 고정한다.
+
 특정 도메인 인프라에 의존하지 않는다. 레포에 `CLAUDE.md` 등 자체 지침이 있으면 함께 따른다.
 
 - 방법론 본문: [`SKILL.md`](SKILL.md)
@@ -48,3 +51,10 @@ cd doil-supervise
 
 예) 위 작업이 도는 중에 `/doil-supervise add 로딩 스켈레톤도 넣어줘`
 → 기존 워커는 두고, 스켈레톤 UI 워커(fable)를 추가 투입한다.
+
+## 선택 요구사항 (optional requirements)
+
+- **codebase-memory MCP** — https://github.com/DeusData/codebase-memory-mcp
+  설치돼 있으면 분석 서브에이전트가 그래프 조회(search_graph/query_graph/trace_path 등)를
+  1순위로 쓰도록 지시한다. 없으면 일반 분석 서브에이전트(Explore 등)로 그대로 진행하고,
+  설치를 짧게 제안한다(강제 아님). 자세한 조건은 [`SKILL.md`](SKILL.md) 참고.
