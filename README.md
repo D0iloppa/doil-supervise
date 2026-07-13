@@ -21,10 +21,13 @@
 ```bash
 git clone https://github.com/D0iloppa/doil-supervise.git
 cd doil-supervise
-./install.sh          # 이 스킬을 <config>/skills/ 로 심볼릭 링크
+./install.sh                 # 이 스킬을 <config>/skills/ 로 심볼릭 링크
+./install.sh --all-profiles  # (옵션) ~ 아래 모든 Claude 프로필에 한 번에 링크
 ```
 
-`install.sh` 는 `CLAUDE_CONFIG_DIR`(없으면 `~/.claude`)의 `skills/` 에 이 repo 를 링크한다.
+기본은 `CLAUDE_CONFIG_DIR`(없으면 `~/.claude`)의 `skills/` 한 곳에 링크한다.
+`--all-profiles` 를 주면 `~/.claude` 및 `~/.claude-*` 중 **`settings.json` 을 가진 실제
+프로필**에 각각 링크한다(계정 설정 스냅샷 등은 제외).
 
 ## 쓰는 법
 
