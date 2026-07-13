@@ -24,9 +24,19 @@ cd doil-supervise
 ## 쓰는 법
 
 ```
-/doil-supervise <실제 과업>
+/doil-supervise <실제 과업>            # 새 오케스트레이션 (이해·명명·라우팅·위임·종합)
+/doil-supervise add <추가 요구>        # 기존 워커 유지, 워커 추가 투입
+/doil-supervise edit <대상>: <변경>    # 특정 워커 방향 변경(SendMessage) 또는 중지(TaskStop)
+/doil-supervise stop <대상>            # 해당 워커만 중지
+/doil-supervise status                # 도는 워커·상태 요약
 ```
+
+> `:` 콜론 하위커맨드가 아니라 **인자 모드**다(콜론은 플러그인 네임스페이스 전용). 첫 토큰
+> `add`/`edit`/`stop`/`status` 로 분기하고, 없으면 기본 오케스트레이션.
 
 예) `/doil-supervise 동네지도 포스트패널에 무한스크롤 붙여줘`
 → 감독이 "이 작업은 *pagination(무한스크롤) 도입* 작업입니다"라 명명하고, 탐색은 sonnet,
 구현은 fable 로 라우팅해 서브에이전트에 위임한 뒤 결과를 종합 보고한다.
+
+예) 위 작업이 도는 중에 `/doil-supervise add 로딩 스켈레톤도 넣어줘`
+→ 기존 워커는 두고, 스켈레톤 UI 워커(fable)를 추가 투입한다.
