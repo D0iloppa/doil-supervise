@@ -75,6 +75,7 @@ description: >-
 - **분석(analysis) 서브에이전트는 codebase-memory MCP 를 1순위로 활용하도록 지시한다** —
   설치 여부 확인·구체 지시 방식은 [`[optional requirements]`](#optional-requirements) 참고.
 - 각 호출에 `model`(haiku/sonnet/opus/fable) 오버라이드를 명시하고, 근거를 함께 남긴다.
+- 대부분의 작업은 sonnet으로도 충분하다. opus, fable은 고비용이므로 합당해야한다. opus이상의 모델을 사용하는 경우, 사용자의 승인을 받아야 한다.
 - **프롬프트에 도구·컨텍스트 사용을 명시적으로 지시한다.** 서브에이전트는 부모 컨텍스트를
   물려받지 않는다 — 필요한 파일 경로, "CLAUDE.md 규약을 따르라" 등을 프롬프트에 직접 써 준다.
 - 독립적인 분석 갈래가 여럿이면 **한 메시지에서 병렬로** 띄운다(동시 실행).
