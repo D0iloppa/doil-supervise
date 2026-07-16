@@ -36,14 +36,19 @@ cd doil-supervise
 
 ```
 /doil-supervise <실제 과업>            # 새 오케스트레이션 (이해·명명·라우팅·위임·종합)
+/doil-supervise follow                # TASK_CONTEXT.md 를 읽고 이어서 진행 (없으면 되물음)
 /doil-supervise add <추가 요구>        # 기존 워커 유지, 워커 추가 투입
 /doil-supervise edit <대상>: <변경>    # 특정 워커 방향 변경(SendMessage) 또는 중지(TaskStop)
 /doil-supervise stop <대상>            # 해당 워커만 중지
 /doil-supervise status                # 도는 워커·상태 요약
+/doil-supervise model-limit <모델>    # 이 세션 한정 모델 상한 설정 (model-limit clear 로 해제)
 ```
 
 > `:` 콜론 하위커맨드가 아니라 **인자 모드**다(콜론은 플러그인 네임스페이스 전용). 첫 토큰
-> `add`/`edit`/`stop`/`status` 로 분기하고, 없으면 기본 오케스트레이션.
+> `follow`/`add`/`edit`/`stop`/`status`/`model-limit` 로 분기하고, 없으면 기본 오케스트레이션.
+> `TASK_CONTEXT.md` 가 저장소 루트에 있으면 `follow` 없이도 0단계(이해)에서 항상 먼저 읽는다.
+> opus/fable 라우팅은 근거 제시와 별개로 **사용자의 명시적 승인**이 와야 위임을 실행한다 —
+> 감독이 스스로 승인 처리하고 자동 진행하지 않는다.
 
 예) `/doil-supervise 동네지도 포스트패널에 무한스크롤 붙여줘`
 → 감독이 "이 작업은 *pagination(무한스크롤) 도입* 작업입니다"라 명명하고, 탐색은 sonnet,
