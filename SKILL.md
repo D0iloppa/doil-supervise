@@ -29,10 +29,15 @@ description: >-
 `$ARGUMENTS`(뒤에 붙은 실제 과업)를 받아 아래 절차로 처리한다.
 
 ### 0. 이해 (Understand) — 감독이 직접, 인라인
-- **저장소 루트에 `TASK_CONTEXT.md` 가 있으면 먼저 읽는다.** 새로 가정을 세우기 전에 기존
-  요청 원문·라우팅 계획·워커 상태를 그 파일에서 확인하고, 이어갈 작업이면 거기서부터
-  follow-up 한다(아래 `follow` 커맨드는 이를 명시적으로 트리거하는 지름길일 뿐, 파일이
-  있으면 커맨드 없이도 항상 확인한다).
+- **task_context 저장소(SoT)를 먼저 확인한다.** `workspace`는 저장소 루트 절대경로(예:
+  `git rev-parse --show-toplevel` 결과)로 고정한다.
+  - **`mcp__doil-context__*` 툴이 노출돼 있으면(설치 여부는 [optional requirements](#optional-requirements)
+    참고)**: `task_context_find_recent(workspace)` 로 최근 메인 티켓을 찾는다. 있으면
+    `task_context_get`/`task_context_find_subs` 로 요청 원문·라우팅 계획·워커 상태를 확인하고
+    이어갈 작업이면 거기서부터 follow-up 한다.
+  - **없으면**: 저장소 루트의 `TASK_CONTEXT.md` 를 폴백으로 읽는다(기존 방식 그대로).
+  - 둘 다 없으면 새로 시작한다. (아래 `follow` 커맨드는 이 확인을 명시적으로 트리거하는
+    지름길일 뿐, 커맨드 없이도 0단계는 항상 먼저 확인한다.)
 - 요청을 읽고 **가정을 명시**한다. 불확실하면 **먼저 묻는다**(카파시 #1). 해석이 둘 이상이면
   모두 제시하고 사용자가 고르게 한다.
 - 더 단순한 길이 있으면 반박한다. **위임 자체가 과할 만큼 사소한 과업**(한 줄 수정, 오타,
@@ -75,10 +80,16 @@ description: >-
 ### 3. 위임 (Delegate) — 서브에이전트 실행
 `Agent` 도구로 worker 를 띄운다. 감독은 코드를 직접 수정하지 않는다.
 
-- **위임 전, 저장소 루트에 `TASK_CONTEXT.md` 를 먼저 작성(또는 기존 파일을 이어서 갱신)한다** —
-  요청 원문, 가정, 표준용어 명명, 라우팅 계획, 워커 목록/상태를 담는다. 세션이 끊겨도 다음
-  세션이 이 파일을 읽고 그대로 이어갈 수 있게 하기 위함이다. 워커가 하나 끝날 때마다(4단계
-  종합, 또는 진행 중 제어의 add/edit/stop 발생 시) 즉시 반영한다.
+- **위임 전, task_context를 먼저 기록(또는 기존 것을 이어서 갱신)한다** — 요청 원문, 가정,
+  표준용어 명명, 라우팅 계획, 워커 목록/상태를 담는다. 세션이 끊겨도 다음 세션이 이를 읽고
+  그대로 이어갈 수 있게 하기 위함이다. 워커가 하나 끝날 때마다(4단계 종합, 또는 진행 중
+  제어의 add/edit/stop 발생 시) 즉시 반영한다.
+  - **`mcp__doil-context__*` 있으면**: `task_context_put(workspace, task_id, task, context)` 로
+    메인 티켓을 쓴다. `task_id`는 감독이 이번 작업을 가리키는 **의미있는 slug**를 직접 짓는다
+    (예: `2026-07-17-auth-refactor`). 각 워커는 `sub_id`를 지정해 **서브 티켓으로 별도 upsert**
+    한다(예: `sub_id: 'analysis-1'`) — 워커 하나 갱신이 다른 워커·메인 문서를 건드리지 않게
+    하기 위함이다.
+  - **없으면**: 저장소 루트 `TASK_CONTEXT.md` 에 직접 쓴다(기존 방식).
 - 이 하위과업의 **검증 가능한 목표 조건**(카파시 #4)을 한 줄로 정의하고 `/goal <조건>` 으로
   감독 세션에 고정한다 — 워커가 도는 동안 감독이 그 조건 충족 여부를 기준으로 다음 턴을
   자동으로 이어가게 하기 위함이다. `/goal` 은 세션 차원 명령이라 워커에게 자동 전파되지
@@ -109,21 +120,26 @@ description: >-
 - 서브에이전트의 최종 메시지는 사용자에게 보이지 않는다. **감독이 핵심만 추려** 보고한다.
 - 무엇을 어떤 모델에 왜 맡겼는지, 결과·검증 상태(테스트/빌드/lint 통과 여부)를 사실대로 전한다.
 - 실패·건너뜀·미검증은 숨기지 않는다.
-- `TASK_CONTEXT.md` 를 갱신한다 — 완료된 워커·결과·남은 우선순위를 반영해 다음 세션이
-  이어갈 수 있게 한다. 모든 워커가 끝나 작업이 완전히 마무리됐으면 `/goal clear` 로 목표를
-  해제한다.
+- task_context 를 갱신한다 — 완료된 워커·결과·남은 우선순위를 반영해 다음 세션이 이어갈 수
+  있게 한다(`mcp__doil-context__*` 있으면 `task_context_put`, 없으면 `TASK_CONTEXT.md` 수정).
+  모든 워커가 끝나 작업이 완전히 마무리됐으면 `/goal clear` 로 목표를 해제한다.
+- **작업이 완전히 마무리됐고 `mcp__doil-context__*` 가 있으면**, 사용자에게 "이 task의
+  task_context를 정리(vacuum)할까요?"라고 되묻는다. 동의하면 `task_context_vacuum(workspace,
+  task_id)` 로 메인+서브 티켓을 모두 삭제한다. **자동으로 vacuum 하지 않는다** — 되묻지 않고
+  넘어가지 않는다.
 
 ## 진행 중 제어 (follow / add / edit / stop / status / model-limit) — 워커가 도는 도중 요구가 바뀔 때
 
 이미 워커가 돌고 있는데 추가 요구·변경·중지가 들어오면 **in-flight 워커를 조정**한다.
 `$ARGUMENTS` 의 첫 토큰으로 분기한다.
 
-- `follow` — 저장소 루트의 `TASK_CONTEXT.md` 를 읽고 그 내용을 기준으로 **0단계(이해)를
-  이어간다**: 이미 기록된 요청 원문·가정·표준용어 명명·라우팅 계획·워커 상태를 그대로
-  이어받아, 처음부터 다시 묻지 않고 남은 워커/우선순위부터 재개한다. `TASK_CONTEXT.md` 가
-  없으면 "이어갈 컨텍스트가 없습니다, 새로 시작할까요?"라고 되묻는다(카파시 #1). 이 커맨드가
-  없어도 0단계는 항상 `TASK_CONTEXT.md` 존재 여부를 먼저 확인한다 — `follow` 는 그걸 명시적으로
-  트리거하는 지름길일 뿐이다.
+- `follow` — task_context(SoT)를 읽고 그 내용을 기준으로 **0단계(이해)를 이어간다**: 이미
+  기록된 요청 원문·가정·표준용어 명명·라우팅 계획·워커 상태를 그대로 이어받아, 처음부터
+  다시 묻지 않고 남은 워커/우선순위부터 재개한다(`mcp__doil-context__*` 있으면
+  `task_context_find_recent` → `task_context_get`/`task_context_find_subs`, 없으면
+  `TASK_CONTEXT.md`). 이어갈 컨텍스트가 없으면 "이어갈 컨텍스트가 없습니다, 새로 시작할까요?"
+  라고 되묻는다(카파시 #1). 이 커맨드가 없어도 0단계는 항상 존재 여부를 먼저 확인한다 —
+  `follow` 는 그걸 명시적으로 트리거하는 지름길일 뿐이다.
 - `add <추가 요구>` — 기존 워커는 그대로 두고 **워커를 추가 투입**한다. 새 하위과업을
   명명·라우팅(모델+근거)한 뒤 `Agent` 로 (가능하면 병렬) 실행한다. 기존 워커와 같은 파일을
   건드릴 위험이 있으면 `isolation: "worktree"`.
@@ -137,13 +153,18 @@ description: >-
   적용되며, 다른 세션·다른 스레드에는 영향을 주지 않는다. 설정 후에는 2단계(라우팅)에서
   이 상한을 넘는 모델을 배정하지 않는다 — 상한 초과가 필요하다고 판단되면 임의로 넘기지
   말고 사용자에게 상향을 먼저 묻는다. `model-limit clear` 로 해제한다(해제 전까지는 세션
-  내내 유지된다). 설정/해제 시 `TASK_CONTEXT.md` 에도 현재 상한을 기록해 `follow` 로
-  이어받을 때 사라지지 않게 한다.
+  내내 유지된다). 설정/해제 시 task_context 에도 현재 상한을 기록해 `follow` 로 이어받을 때
+  사라지지 않게 한다.
+- `vacuum-all` — **(`mcp__doil-context__*` 전용, 명시적 호출 시에만)** 이 workspace의
+  task_context를 **모두** 삭제한다. `task_context_vacuum_all(workspace, confirm:false)` 로
+  먼저 현재 개수를 조회해 사용자에게 보여주고 "모두 삭제합니다, 진행할까요?"라고 재확인한
+  뒤, 동의를 받으면 `confirm:true` 로 재호출한다. **절대 자동으로 트리거하지 않는다** — 다른
+  절차의 부산물로 호출되지 않는다.
 
 대상 지정은 위임 시 감독이 붙인 **워커 라벨**이나 하위과업 설명으로 가리킨다. 애매하면
 `status` 로 목록을 보이고 어느 워커인지 되묻는다(카파시 #1). 제어 모드에서도 새로 투입하는
 워커는 반드시 **명명·라우팅 근거**를 거친다(기본 절차와 동일, `model-limit` 상한도 그대로
-적용). add/edit/stop 처리 직후에도 `TASK_CONTEXT.md` 의 워커 상태를 즉시 갱신한다.
+적용). add/edit/stop 처리 직후에도 task_context 의 워커 상태를 즉시 갱신한다.
 
 ## [optional requirements]
 
@@ -160,18 +181,35 @@ description: >-
   - 설치 여부는 세션에 `mcp__codebase-memory__*` 도구가 실제로 노출돼 있는지로 판단한다
     (ToolSearch 등으로 확인). 없으면 억지로 흉내내지 않고 바로 폴백한다.
 
+- **doil-context MCP** — 이 스킬 저장소 안의 `mcp-server/` (dJinn/SQLite 기반). `TASK_CONTEXT.md`
+  의 SoT 역할을 대체하는 선택적 요구사항이다 — 있으면 우선 사용하고, 없으면 `TASK_CONTEXT.md`
+  로 그대로 폴백한다(0/3/4단계 및 진행 중 제어에 폴백 규칙이 명시돼 있다).
+  - **설치**: `mcp-server/`에서 `npm install` 후, Claude Code MCP 설정에 `node
+    <스킬경로>/mcp-server/src/index.js` 를 stdio 서버로 등록한다.
+  - **설치돼 있으면**: `mcp__doil-context__task_context_put/get/find_subs/find_recent/del`
+    로 메인/서브 티켓을 관리하고, 작업 완료 후에는 `task_context_vacuum` (사용자 확인 후),
+    필요 시 `task_context_export_md` 로 `TASK_CONTEXT.md` 형식 스냅샷을 뽑아 다른 도구/사람이
+    참고하게 할 수 있다.
+  - **설치돼 있지 않으면**: `TASK_CONTEXT.md` 읽기/쓰기로 그대로 진행한다. 절차를 막지 않되,
+    "doil-context MCP를 설치하면 여러 워크스페이스/세션 간 컨텍스트 조회·정리가 쉬워집니다"
+    라고 짧게 설치를 제안한다(강제하지 않음).
+  - 설치 여부는 세션에 `mcp__doil-context__*` 도구가 실제로 노출돼 있는지로 판단한다.
+
 ## 요약 (감독의 1턴 골격)
 
 ```
-0) 이해 전 → TASK_CONTEXT.md 있으면 먼저 읽고 이어감 (follow 커맨드는 이걸 명시적으로 트리거)
+0) 이해 전 → task_context 있으면 먼저 읽고 이어감 (doil-context MCP 1순위, 없으면 TASK_CONTEXT.md;
+           follow 커맨드는 이걸 명시적으로 트리거)
 1) 이해   → 가정 명시 / 애매하면 질문 / 과설계면 push back
 2) 명명   → "이 작업은 «표준용어» 작업입니다." (한 줄)
 3) 라우팅 → 하위과업별 모델 + 근거 (사소 시각·문구=haiku, 로직·디자인=fable/opus, model-limit 상한 준수)
-4) 위임   → TASK_CONTEXT.md 작성 → /goal 고정 → [opus/fable 배정 시 AskUserQuestion 으로
-           승인 대기, 응답 오기 전 위임 실행 금지] → Agent(analysis, codebase-memory MCP 1순위)
-           → [읽고] → Agent(implementation) [→ reviewer]
-5) 종합   → 결과·검증상태 사실 보고 → TASK_CONTEXT.md 갱신 → /goal clear
+4) 위임   → task_context 작성(메인 티켓, 워커=서브 티켓) → /goal 고정 → [opus/fable 배정 시
+           AskUserQuestion 으로 승인 대기, 응답 오기 전 위임 실행 금지] → Agent(analysis,
+           codebase-memory MCP 1순위) → [읽고] → Agent(implementation) [→ reviewer]
+5) 종합   → 결과·검증상태 사실 보고 → task_context 갱신 → /goal clear → 완전 종료 시 vacuum
+           여부 사용자에게 확인(동의 시에만 삭제)
 
-진행 중: follow(TASK_CONTEXT.md 이어받기) / add(워커 추가) / edit(방향변경·중지) / stop / status
-        / model-limit(이 세션 한정 모델 상한 설정, TASK_CONTEXT.md 에도 기록) (각각 TASK_CONTEXT.md 갱신)
+진행 중: follow(task_context 이어받기) / add(워커 추가) / edit(방향변경·중지) / stop / status
+        / model-limit(이 세션 한정 모델 상한 설정, task_context 에도 기록) / vacuum-all(workspace
+        전체 삭제 — 명시적 호출 + 개수 확인 + 재확인 필수, 자동 트리거 금지) (각각 task_context 갱신)
 ```

@@ -1,0 +1,15 @@
+{
+  "name": "doil-context-mcp",
+  "version": "0.1.0",
+  "description": "doil-supervise skill's task_context store — dJinn(SQLite)-backed MCP server, SoT replacement for TASK_CONTEXT.md",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "bin": {
+    "doil-context-mcp": "src/index.js"
+  },
+  "dependencies": {
+    "@d0iloppa/djinn": "git+https://github.com/D0iloppa/dJinn.git#3eacee5b03bc041e09f777aac6d581ebd97f63a8",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.23.8"
+  }
+}

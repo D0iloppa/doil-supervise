@@ -5,8 +5,10 @@
 (terminology grounding) → 하위 과업별 **모델 라우팅**(근거 제시) → 분석·구현을
 **서브에이전트에 위임** → 결과 종합·보고. supervisor-worker 멀티에이전트 패턴.
 
-위임 전 저장소 루트에 `TASK_CONTEXT.md` 를 써 두고 워커가 끝날 때마다 갱신해, 세션이 끊겨도
-다음 세션이 이어갈 수 있게 한다. 하위과업의 검증 조건은 `/goal` 로 감독 세션에 고정한다.
+위임 전 task_context(SoT)를 써 두고 워커가 끝날 때마다 갱신해, 세션이 끊겨도 다음 세션이
+이어갈 수 있게 한다. `mcp-server/`(doil-context MCP, dJinn/SQLite 기반)가 설치돼 있으면
+그걸 우선 쓰고, 없으면 저장소 루트 `TASK_CONTEXT.md` 로 폴백한다. 하위과업의 검증 조건은
+`/goal` 로 감독 세션에 고정한다.
 
 특정 도메인 인프라에 의존하지 않는다. 레포에 `CLAUDE.md` 등 자체 지침이 있으면 함께 따른다.
 
@@ -42,6 +44,8 @@ cd doil-supervise
 /doil-supervise stop <대상>            # 해당 워커만 중지
 /doil-supervise status                # 도는 워커·상태 요약
 /doil-supervise model-limit <모델>    # 이 세션 한정 모델 상한 설정 (model-limit clear 로 해제)
+/doil-supervise vacuum-all             # (doil-context MCP 전용) workspace의 task_context 전체 삭제.
+                                        # 개수 확인 → 재확인 후에만 실행, 자동 트리거 없음
 ```
 
 > `:` 콜론 하위커맨드가 아니라 **인자 모드**다(콜론은 플러그인 네임스페이스 전용). 첫 토큰
@@ -63,3 +67,11 @@ cd doil-supervise
   설치돼 있으면 분석 서브에이전트가 그래프 조회(search_graph/query_graph/trace_path 등)를
   1순위로 쓰도록 지시한다. 없으면 일반 분석 서브에이전트(Explore 등)로 그대로 진행하고,
   설치를 짧게 제안한다(강제 아님). 자세한 조건은 [`SKILL.md`](SKILL.md) 참고.
+
+- **doil-context MCP** — 이 저장소 안의 [`mcp-server/`](mcp-server). `TASK_CONTEXT.md` 의
+  SoT 역할을 dJinn(SQLite) 기반 MCP 서버로 대체하는 선택적 요구사항이다 — 워크스페이스별로
+  메인/서브(워커) 티켓을 분리 저장해 여러 프로젝트·세션 간 컨텍스트가 섞이지 않게 하고,
+  `vacuum`/`vacuum-all`/`export_md` 로 정리·스냅샷을 지원한다. 설치:
+  `cd mcp-server && npm install` 후 Claude Code MCP 설정에 `node <스킬경로>/mcp-server/src/index.js`
+  를 stdio 서버로 등록. 없으면 `TASK_CONTEXT.md` 로 그대로 폴백한다. 자세한 조건은
+  [`SKILL.md`](SKILL.md) 참고.
