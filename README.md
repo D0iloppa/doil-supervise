@@ -43,7 +43,7 @@ cd doil-supervise
 /doil-supervise edit <대상>: <변경>    # 특정 워커 방향 변경(SendMessage) 또는 중지(TaskStop)
 /doil-supervise stop <대상>            # 해당 워커만 중지
 /doil-supervise status                # 도는 워커·상태 요약
-/doil-supervise model-limit <모델>    # 이 세션 한정 모델 상한 설정 (model-limit clear 로 해제)
+/doil-supervise model-limit <T1|T2|T3> # 이 세션 한정 모델 tier 상한 설정 (model-limit clear 로 해제)
 /doil-supervise vacuum-all             # (doil-context MCP 전용) workspace의 task_context 전체 삭제.
                                         # 개수 확인 → 재확인 후에만 실행, 자동 트리거 없음
 ```
@@ -51,15 +51,18 @@ cd doil-supervise
 > `:` 콜론 하위커맨드가 아니라 **인자 모드**다(콜론은 플러그인 네임스페이스 전용). 첫 토큰
 > `follow`/`add`/`edit`/`stop`/`status`/`model-limit` 로 분기하고, 없으면 기본 오케스트레이션.
 > `TASK_CONTEXT.md` 가 저장소 루트에 있으면 `follow` 없이도 0단계(이해)에서 항상 먼저 읽는다.
-> opus/fable 라우팅은 근거 제시와 별개로 **사용자의 명시적 승인**이 와야 위임을 실행한다 —
-> 감독이 스스로 승인 처리하고 자동 진행하지 않는다.
+> T3(심층) 라우팅은 근거 제시와 별개로 **사용자의 명시적 승인**이 와야 위임을 실행한다 —
+> 감독이 스스로 승인 처리하고 자동 진행하지 않는다. tier(T1/T2/T3)와 provider별(Claude/Codex)
+> 구체 모델명은 [`SKILL.md`의 모델 티어 조견표](SKILL.md#모델-티어-model-tier--provider-범용-조견표)
+> 참고.
 
 예) `/doil-supervise 동네지도 포스트패널에 무한스크롤 붙여줘`
-→ 감독이 "이 작업은 *pagination(무한스크롤) 도입* 작업입니다"라 명명하고, 탐색은 sonnet,
-구현은 fable 로 라우팅해 서브에이전트에 위임한 뒤 결과를 종합 보고한다.
+→ 감독이 "이 작업은 *pagination(무한스크롤) 도입* 작업입니다"라 명명하고, 탐색은 T2(표준,
+Claude 기준 sonnet), 구현은 T3(심층, Claude 기준 fable) 로 라우팅해 서브에이전트에 위임한
+뒤 결과를 종합 보고한다.
 
 예) 위 작업이 도는 중에 `/doil-supervise add 로딩 스켈레톤도 넣어줘`
-→ 기존 워커는 두고, 스켈레톤 UI 워커(fable)를 추가 투입한다.
+→ 기존 워커는 두고, 스켈레톤 UI 워커(T3, Claude 기준 fable)를 추가 투입한다.
 
 ## 선택 요구사항 (optional requirements)
 
