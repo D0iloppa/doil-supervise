@@ -272,8 +272,9 @@ description: >-
 3) 라우팅 → (2-0) 실행 수단 먼저: LLM inference vs 결정적 코드(program). 대량·규칙화 가능 →
            param_generator + seed_generator + 루프(토큰 0); 소량·즉답 → 인라인(구구단 3단에
            구구단(n) 금지); 애매하면 "프로그램으로 할까요?" 되묻기
-           → (2-1) LLM 으로 남는 것만 모델 배분 + 근거 (사소=haiku, 로직·디자인=fable/opus,
-           model-limit 상한 준수) [+ 계정 축: 토큰 부족 & void-dispatch 있으면 다른 계정 오프로딩]
+           → (2-1) LLM 으로 남는 것만 모델 배분 + 근거 (사소=haiku, 일반 로직·UI·디자인 구현=sonnet, 
+            코어 설계·머니/인증 등 고위험 경로=fable/opus, model-limit 상한 준수) 
+            [+ 계정 축: 토큰 부족 & void-dispatch 있으면 다른 계정 오프로딩]
 4) 위임   → task_context 작성(메인 티켓, 워커=서브 티켓) → /goal 고정 → [opus/fable 배정 시
            AskUserQuestion 으로 승인 대기, 응답 오기 전 위임 실행 금지] → Agent(analysis,
            codebase-memory MCP 1순위) → [읽고] → Agent(implementation) [→ reviewer]
