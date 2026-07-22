@@ -7,7 +7,9 @@ description: >-
   (4) 분석·구현을 서브에이전트에 위임하고 감독은 이해·라우팅·검토·종합만 맡는 supervisor-worker
   패턴이다. "이거 서브에이전트로 시켜줘 / 네가 직접 하지 말고 위임해서 / 적절한 모델 골라서 /
   이 작업이 무슨 작업인지도 알려줘" 류, 그리고 구현·리팩터링·조사 등 하위 과업으로 쪼개
-  위임하는 게 이로운 작업에서 트리거된다. 사소한 1회성 수정에는 쓰지 않는다.
+  위임하는 게 이로운 작업에서 트리거된다. 사소한 1회성 수정에는 쓰지 않는다. 세션 토큰이
+  부족할 때 void-dispatch MCP 가 있으면 워커를 다른 계정 프로파일로 헤드리스 위임(오프로딩)해
+  그 계정의 토큰으로 실행시킬 수 있다.
 ---
 
 # doil-supervise
@@ -111,6 +113,16 @@ description: >-
   다운그레이드하거나 무시하지 말고 사용자에게 상한 상향 여부를 먼저 묻는다.
 - **프롬프트에 도구·컨텍스트 사용을 명시적으로 지시한다.** 서브에이전트는 부모 컨텍스트를
   물려받지 않는다 — 필요한 파일 경로, "CLAUDE.md 규약을 따르라" 등을 프롬프트에 직접 써 준다.
+- **세션 토큰이 부족할 때 — 계정-교차 위임(cross-account offload).** `mcp__void-dispatch__*`
+  도구가 노출돼 있으면(설치 여부는 [optional requirements](#optional-requirements) 참고),
+  워커를 현재 계정의 `Agent` 서브에이전트로 띄우는 대신 **다른 계정 프로파일로 위임**할 수
+  있다 — inference 가 그 계정 토큰으로 청구된다. `list_profiles` 로 로그인된(위임 가능한)
+  프로파일을 확인하고, `delegate(profile, prompt, {permission_mode})` 로 헤드리스 실행한다.
+  현재 세션 토큰이 부족/소진됐을 때만 쓰고, 여유가 있으면 기본 `Agent` 경로를 유지한다.
+  `delegate` 는 1회성 헤드리스 실행(결과 텍스트 반환)이라 **자기완결적 분석·구현 과업**에
+  적합하고, 여러 턴 상호작용이 필요한 워커에는 부적합하다 — 그런 워커는 `Agent` 로 띄운다.
+  라우팅(2단계)의 "모델" 축과 직교하는 **"토큰 풀(계정)" 축**으로 다루고, 반환값의
+  usage/costUsd 를 종합(4단계)에 사실대로 반영한다.
 - 독립적인 분석 갈래가 여럿이면 **한 메시지에서 병렬로** 띄운다(동시 실행).
 - 구현이 파일을 병렬 변경해 충돌 위험이 있으면 `isolation: "worktree"` 를 쓴다.
 - 검토가 필요한 고위험 변경(머니 경로·인증)이면 구현 뒤 **독립 reviewer 서브에이전트**를
@@ -195,6 +207,27 @@ description: >-
     라고 짧게 설치를 제안한다(강제하지 않음).
   - 설치 여부는 세션에 `mcp__doil-context__*` 도구가 실제로 노출돼 있는지로 판단한다.
 
+- **void-dispatch MCP** — void 런처(void-ai-launcher)의 `lib/voidDispatchMcp.js` (stdio 서버,
+  `.mcp.json` 에 `void-dispatch` 로 등록). 서브에이전트 워커를 **다른 계정 프로파일로 헤드리스
+  위임**해 그 계정의 토큰으로 실행시키는 선택적 요구사항이다 — 현재 세션 토큰이 부족할 때의
+  오프로딩 채널이다. Claude Code 의 네이티브 `Agent` 서브에이전트는 부모 계정 크리덴셜을
+  상속하므로 다른 계정으로 청구시킬 수 없다. 반면 void 의 named session 은 격리된
+  `CLAUDE_CONFIG_DIR` + 독립 로그인을 가지므로, 그 프로파일로 헤드리스 `claude -p` / `codex
+  exec` 를 1회 spawn 하면 inference 가 100% 그 계정 토큰으로 청구된다.
+  - **설치돼 있으면**: 세션 토큰이 부족/소진된 상황에서 `list_profiles({tool_command})` 로
+    로그인된(ready) 위임 대상을 확인하고, `delegate({profile, prompt, tool_command, model,
+    permission_mode, allowed_tools, cwd, timeout_ms})` 로 워커를 다른 계정으로 실행한다.
+    inference 는 지정 프로파일 계정으로 청구되며, 반환값의 `usage`/`costUsd`(그 계정이 실제
+    쓴 사용량)를 종합에 반영한다. 파일 편집·명령 실행 등 실작업을 시키려면
+    `permission_mode`(예: `acceptEdits`) 를 넘겨야 한다. 위임은 자기완결적 과업에 적합하다 —
+    여러 턴 상호작용이 필요하면 기본 `Agent` 로 띄운다.
+  - **설치돼 있지 않으면**: 모든 워커를 `Agent`(현재 계정) 로 띄운다. 절차를 막지 않되,
+    세션 토큰 부족이 반복되면 "void-dispatch MCP 를 붙이면 다른 계정으로 워커를 오프로딩할
+    수 있습니다" 라고 짧게 제안한다(강제하지 않음).
+  - 위임 대상 프로파일은 void 의 named session 으로 미리 만들어 그 계정으로 로그인돼 있어야
+    한다 — `list_profiles` 의 `ready`/`warnings` 로 로그인 여부를 점검할 수 있다. 설치 여부는
+    세션에 `mcp__void-dispatch__*` 도구가 실제로 노출돼 있는지로 판단한다.
+
 ## 요약 (감독의 1턴 골격)
 
 ```
@@ -203,9 +236,11 @@ description: >-
 1) 이해   → 가정 명시 / 애매하면 질문 / 과설계면 push back
 2) 명명   → "이 작업은 «표준용어» 작업입니다." (한 줄)
 3) 라우팅 → 하위과업별 모델 + 근거 (사소 시각·문구=haiku, 로직·디자인=fable/opus, model-limit 상한 준수)
+           [+ 계정 축: 세션 토큰 부족 & void-dispatch 있으면 워커를 다른 계정으로 오프로딩]
 4) 위임   → task_context 작성(메인 티켓, 워커=서브 티켓) → /goal 고정 → [opus/fable 배정 시
            AskUserQuestion 으로 승인 대기, 응답 오기 전 위임 실행 금지] → Agent(analysis,
            codebase-memory MCP 1순위) → [읽고] → Agent(implementation) [→ reviewer]
+           [토큰 부족 시 & void-dispatch 있으면 delegate(profile,prompt) 로 다른 계정 헤드리스 실행]
 5) 종합   → 결과·검증상태 사실 보고 → task_context 갱신 → /goal clear → 완전 종료 시 vacuum
            여부 사용자에게 확인(동의 시에만 삭제)
 
