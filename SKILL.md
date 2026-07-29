@@ -23,20 +23,24 @@ delegate, and synthesize. Actual analysis and implementation is done by subagent
 
 ## Model Tiers (Provider-Agnostic Lookup Table)
 
-This skill's routing isn't tied to Claude-specific model names (haiku/sonnet/opus/fable). Use
-the **3 tiers below as a provider-neutral baseline**, and refer to them by **tier name
-(T1/T2/T3) only** everywhere else in this document (2-1 Model Allocation, model-limit, etc.).
-Right **before** each `Agent`/`delegate` call, look up the concrete model in the table below
-based on the provider (Claude Code / Codex CLI / etc.) the subagent will run on.
+This skill's routing isn't tied to Claude-specific model names (fable/opus/sonnet/haiku). Use
+the **4 tiers below as a provider-neutral baseline**, and refer to them by **tier name
+(T1/T2/T3/T4) only** everywhere else in this document (2-1 Model Allocation, model-limit,
+etc.). Tier numbers follow flagship order — **T1 is the most capable, numbers descend from
+there** — so a smaller number always means "more capable / more expensive," matching how
+people already talk about "tier 1" as the top tier. Right **before** each `Agent`/`delegate`
+call, look up the concrete model in the table below based on the provider (Claude Code / Codex
+CLI / etc.) the subagent will run on.
 
 | Tier | Criteria | Claude (Claude Code `Agent`) | Codex (OpenAI Codex CLI) |
 |------|----------|-------------------------------|----------------------------|
-| **T1 · Light** | Simple/mechanical, high-volume repetition, low risk | `haiku` (`claude-haiku-4-5-20251001`) | `gpt-5-codex`, reasoning effort `minimal`/`low` |
-| **T2 · Standard** | Core day-to-day logic, UI/design implementation, exploration | `sonnet` (`claude-sonnet-5`) | `gpt-5-codex`, reasoning effort `medium` |
-| **T3 · Deep** | Core architecture, high-stakes paths (money/auth) | `opus` (`claude-opus-4-8`) or `fable` (`claude-fable-5`) | `gpt-5-codex`, reasoning effort `high`/`xhigh` |
+| **T1 · Flagship** | The most demanding reasoning: novel/ambiguous architecture calls, judgment with no clear precedent. Escalate here from T2 only when T2-level reasoning proves insufficient. | `fable` (`claude-fable-5`) | `gpt-5-codex`, reasoning effort `xhigh` |
+| **T2 · Deep** | Core architecture, high-stakes paths (money/auth) — the default pick for this band | `opus` (`claude-opus-4-8`) | `gpt-5-codex`, reasoning effort `high` |
+| **T3 · Standard** | Core day-to-day logic, UI/design implementation, exploration | `sonnet` (`claude-sonnet-5`) | `gpt-5-codex`, reasoning effort `medium` |
+| **T4 · Light** | Simple/mechanical, high-volume repetition, low risk | `haiku` (`claude-haiku-4-5-20251001`) | `gpt-5-codex`, reasoning effort `minimal`/`low` |
 
 - **Claude Code sessions**: the `Agent` tool's `model` parameter only accepts the strings
-  `haiku`/`sonnet`/`opus`/`fable` — once you've picked a tier, pass the Claude-column value
+  `fable`/`opus`/`sonnet`/`haiku` — once you've picked a tier, pass the Claude-column value
   as-is.
 - **Codex sessions** (e.g. `mcp__void-dispatch__delegate` with `tool_command: 'codex exec'`):
   tiers are often implemented via reasoning-effort on a single model family (`gpt-5-codex`)
@@ -136,7 +140,7 @@ specifically, *programmatic generation* (generator + loop).
   have a program in mind for this, or should I just fill it in inline?" — ask the caller
   explicitly like this.
 - If you go the program route, **writing the generator/seeder itself becomes an
-  implementation subtask** and rides the same model routing below (usually T2). The execution
+  implementation subtask** and rides the same model routing below (usually T3). The execution
   (the loop) afterward runs as code and burns no tokens.
 
 #### 2-1. Model allocation *(only for subtasks that remain LLM work)*
@@ -144,24 +148,26 @@ Default allocation (repo-specific guidance takes precedence if it differs). Tier
 and provider-specific concrete model names follow the
 [Model Tier Lookup Table](#model-tiers-provider-agnostic-lookup-table):
 
-- Simple/mechanical work → **T1 (Light)**
+- Simple/mechanical work → **T4 (Light)**
   - CSS px/font tweaks, copy changes, color-token swaps, i18n, trivial code removal
   - *Rule:* if the overhead of delegating to a model outweighs the task itself, propose
     handling it inline instead of running a prompt (step-0 push back).
 
-- Core day-to-day work and UI implementation → **T2 (Standard)**
+- Core day-to-day work and UI implementation → **T3 (Standard)**
   - General business logic, search/exploration, doc cleanup, pattern mirroring
-  - Design and UI improvements (T2 handles research through actual code implementation
+  - Design and UI improvements (T3 handles research through actual code implementation
     end-to-end, to avoid losing context)
 
-- Core architecture and high-stakes paths → **T3 (Deep)**
+- Core architecture and high-stakes paths → **T2 (Deep)**
   - Complex system architecture and design phases
   - Money paths (payments/rewards/auth) and other logic where security and data integrity
     are non-negotiable
+  - This is the default pick for this band; escalate to **T1 (Flagship)** only when the task
+    is exceptionally complex or ambiguous and T2-level reasoning isn't enough
 
 Rationale examples: "Locating code is a mechanical task where coverage matters —
-T2 (Standard)"; "Naming a trust system / visual design requires quality judgment —
-T3 (Deep)."
+T3 (Standard)"; "Naming a trust system / visual design requires quality judgment —
+T2 (Deep)."
 
 ### 3. Delegate — run subagents
 Spin up workers with the `Agent` tool. The supervisor never edits code directly.
@@ -188,22 +194,24 @@ Spin up workers with the `Agent` tool. The supervisor never edits code directly.
 - **Instruct analysis subagents to use the codebase-memory MCP as their first choice** — see
   [optional requirements](#optional-requirements) for how to check installation and how to
   phrase the instruction.
-- For each call, decide the tier (T1/T2/T3), look up the concrete model for the provider
+- For each call, decide the tier (T1/T2/T3/T4), look up the concrete model for the provider
   (Claude Code / Codex / etc.) that subagent will run on from the
   [Model Tier Lookup Table](#model-tiers-provider-agnostic-lookup-table), pass it via the
   `model` parameter (or delegate's `model`), and state the rationale alongside it.
-- Most work is fine at T2 (Standard). T3 (Deep) is expensive, so only assign it when the
-  rationale is clear.
-- **T3 (Deep) assignments never proceed automatically — never move forward without
-  approval.** If the routing plan includes even one T3 (Deep) assignment, **before** the
-  `Agent` call, separate from stating the rationale, use `AskUserQuestion` (or an equally
-  explicit confirmation message) to **ask the user to confirm, and wait for an actual
-  reply.** Don't decide on your own that "I gave a rationale, so it's fine" and proceed with
-  delegation anyway — this confirmation only counts as passed once the user's explicit reply
-  arrives.
-- **If `model-limit` is set for the session, never assign a tier above that ceiling** (see
-  "Session Model Ceiling" below). If you judge the task genuinely needs to exceed the
-  ceiling, don't silently downgrade or ignore it during routing — ask the user first whether
+- Most work is fine at T3 (Standard). T2 (Deep) and T1 (Flagship) are expensive, so only
+  assign them when the rationale is clear.
+- **Any T2 (Deep) or T1 (Flagship) assignment — i.e. T2 tier or more capable — never
+  proceeds automatically. Never move forward without approval.** If the routing plan
+  includes even one T2-or-above assignment, **before** the `Agent` call, separate from
+  stating the rationale, use `AskUserQuestion` (or an equally explicit confirmation message)
+  to **ask the user to confirm, and wait for an actual reply.** Don't decide on your own that
+  "I gave a rationale, so it's fine" and proceed with delegation anyway — this confirmation
+  only counts as passed once the user's explicit reply arrives.
+- **If `model-limit` is set for the session, never assign a tier more capable than that
+  ceiling** (see "Session Model Ceiling" below — since T1 is the most capable, "more capable
+  than the ceiling" means a *smaller* tier number than the ceiling, e.g. a `T3` ceiling
+  forbids T1/T2 and allows T3/T4). If you judge the task genuinely needs to exceed the
+  ceiling, don't silently upgrade or ignore it during routing — ask the user first whether
   to raise the ceiling.
 - **Explicitly instruct tool/context usage in the prompt.** Subagents don't inherit the
   parent's context — spell out the file paths needed, "follow the CLAUDE.md conventions,"
@@ -267,15 +275,17 @@ When new requirements, changes, or a stop come in while workers are already runn
     prompt if needed.
 - `stop <target>` — `TaskStop` on just that worker. (Shorthand for `edit`'s stop case.)
 - `status` — summarize running workers/status for the user via `TaskList`/`TaskGet`.
-- `model-limit <T1|T2|T3>` — sets an **upper bound** on the tier that can be routed, **scoped
-  to this thread (the current supervisor session) only** (tier definitions in the
+- `model-limit <T1|T2|T3|T4>` — sets an **upper bound on capability** (a floor on the tier
+  number) for the tier that can be routed, **scoped to this thread (the current supervisor
+  session) only** (tier definitions in the
   [Model Tier Lookup Table](#model-tiers-provider-agnostic-lookup-table)). Not a skill-wide
   setting — it only applies to the session this skill was invoked in, and doesn't affect
-  other sessions/threads. Once set, step 2 (routing) never assigns a tier above this ceiling
-  — if exceeding it is genuinely necessary, don't silently push past it; ask the user first
-  whether to raise it. Clear with `model-limit clear` (stays in effect for the rest of the
-  session until cleared). Record the current ceiling in task_context on set/clear so it
-  isn't lost when `follow` picks the session back up.
+  other sessions/threads. Once set, step 2 (routing) never assigns a tier more capable than
+  this ceiling (i.e. never a smaller tier number) — if exceeding it is genuinely necessary,
+  don't silently push past it; ask the user first whether to raise it. Clear with
+  `model-limit clear` (stays in effect for the rest of the session until cleared). Record
+  the current ceiling in task_context on set/clear so it isn't lost when `follow` picks the
+  session back up.
 - `vacuum-all` — **(`mcp__doil-context__*` only, explicit invocation only)** deletes **all**
   task_context for this workspace. First query the current count with
   `task_context_vacuum_all(workspace, confirm:false)`, show it to the user and confirm:
@@ -361,24 +371,25 @@ processing add/edit/stop as well.
            High-volume & rule-izable → param_generator + seed_generator + loop (zero tokens);
            small & one-shot → inline (don't write times_table(n) for "print the 3-times table");
            if unclear, ask "should this be a program?"
-           → (2-1) allocate tier only for what remains LLM work, with rationale (trivial=T1,
-            general logic/UI/design implementation=T2, core architecture/money-auth high-stakes
-            paths=T3, respect model-limit ceiling — look up the concrete model per provider in
-            the [Model Tier Lookup Table](#model-tiers-provider-agnostic-lookup-table))
+           → (2-1) allocate tier only for what remains LLM work, with rationale (trivial=T4,
+            general logic/UI/design implementation=T3, core architecture/money-auth high-stakes
+            paths=T2 (escalate to T1 only if T2-level reasoning isn't enough), respect
+            model-limit ceiling — look up the concrete model per provider in the
+            [Model Tier Lookup Table](#model-tiers-provider-agnostic-lookup-table))
             [+ account axis: offload to another account if tokens are low & void-dispatch is
             available]
-4) Delegate → write task_context (main ticket, workers = sub-tickets) → pin /goal → [if T3 is
-           assigned, wait for approval via AskUserQuestion — never delegate before the reply
-           arrives] → Agent(analysis, codebase-memory MCP first) → [read it] →
-           Agent(implementation) [→ reviewer]
+4) Delegate → write task_context (main ticket, workers = sub-tickets) → pin /goal → [if T2 or
+           more capable (T1/T2) is assigned, wait for approval via AskUserQuestion — never
+           delegate before the reply arrives] → Agent(analysis, codebase-memory MCP first) →
+           [read it] → Agent(implementation) [→ reviewer]
            [if tokens are low & void-dispatch is available, run delegate(profile,prompt)
            headlessly on another account]
 5) Synthesize → report results/verification status truthfully → update task_context → /goal
            clear → ask the user about vacuuming once fully done (delete only if they agree)
 
 In-flight: follow (resume from task_context) / add (launch worker) / edit (redirect/stop) /
-        stop / status / model-limit (this-session-only tier ceiling T1|T2|T3, also recorded in
-        task_context) / vacuum-all (delete entire workspace — explicit call + count
+        stop / status / model-limit (this-session-only tier ceiling T1|T2|T3|T4, also recorded
+        in task_context) / vacuum-all (delete entire workspace — explicit call + count
         confirmation + re-confirmation required, never auto-triggered) (each updates
         task_context)
 ```
