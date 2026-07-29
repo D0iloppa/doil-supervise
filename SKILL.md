@@ -35,7 +35,7 @@ CLI / etc.) the subagent will run on.
 | Tier | Criteria | Claude (Claude Code `Agent`) | Codex (OpenAI Codex CLI) |
 |------|----------|-------------------------------|----------------------------|
 | **T1 · Flagship** | The most demanding reasoning: novel/ambiguous architecture calls, judgment with no clear precedent. Escalate here from T2 only when T2-level reasoning proves insufficient. | `fable` (`claude-fable-5`) | `gpt-5-codex`, reasoning effort `xhigh` |
-| **T2 · Deep** | Escalation only: real architecture design decisions, or money/auth logic needing unusually rigorous correctness review | `opus` (`claude-opus-4-8`) | `gpt-5-codex`, reasoning effort `high` |
+| **T2 · Deep** | Escalation only: real architecture design decisions, or money/auth logic needing unusually rigorous correctness review | `opus` (`claude-opus-5`) | `gpt-5-codex`, reasoning effort `high` |
 | **T3 · Standard** | The default for almost everything — core day-to-day logic, UI/design implementation, exploration, and most architecture/money-auth *implementation* | `sonnet` (`claude-sonnet-5`) | `gpt-5-codex`, reasoning effort `medium` |
 | **T4 · Light** | Simple/mechanical, high-volume repetition, low risk | `haiku` (`claude-haiku-4-5-20251001`) | `gpt-5-codex`, reasoning effort `minimal`/`low` |
 
