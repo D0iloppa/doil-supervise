@@ -35,8 +35,8 @@ CLI / etc.) the subagent will run on.
 | Tier | Criteria | Claude (Claude Code `Agent`) | Codex (OpenAI Codex CLI) |
 |------|----------|-------------------------------|----------------------------|
 | **T1 · Flagship** | The most demanding reasoning: novel/ambiguous architecture calls, judgment with no clear precedent. Escalate here from T2 only when T2-level reasoning proves insufficient. | `fable` (`claude-fable-5`) | `gpt-5-codex`, reasoning effort `xhigh` |
-| **T2 · Deep** | Core architecture, high-stakes paths (money/auth) — the default pick for this band | `opus` (`claude-opus-4-8`) | `gpt-5-codex`, reasoning effort `high` |
-| **T3 · Standard** | Core day-to-day logic, UI/design implementation, exploration | `sonnet` (`claude-sonnet-5`) | `gpt-5-codex`, reasoning effort `medium` |
+| **T2 · Deep** | Escalation only: real architecture design decisions, or money/auth logic needing unusually rigorous correctness review | `opus` (`claude-opus-4-8`) | `gpt-5-codex`, reasoning effort `high` |
+| **T3 · Standard** | The default for almost everything — core day-to-day logic, UI/design implementation, exploration, and most architecture/money-auth *implementation* | `sonnet` (`claude-sonnet-5`) | `gpt-5-codex`, reasoning effort `medium` |
 | **T4 · Light** | Simple/mechanical, high-volume repetition, low risk | `haiku` (`claude-haiku-4-5-20251001`) | `gpt-5-codex`, reasoning effort `minimal`/`low` |
 
 - **Claude Code sessions**: the `Agent` tool's `model` parameter only accepts the strings
@@ -153,21 +153,30 @@ and provider-specific concrete model names follow the
   - *Rule:* if the overhead of delegating to a model outweighs the task itself, propose
     handling it inline instead of running a prompt (step-0 push back).
 
-- Core day-to-day work and UI implementation → **T3 (Standard)**
+- **Default for everything else, including architecture and money/auth work → T3
+  (Standard)**
   - General business logic, search/exploration, doc cleanup, pattern mirroring
   - Design and UI improvements (T3 handles research through actual code implementation
     end-to-end, to avoid losing context)
+  - Also the default for *implementing* system architecture and money/auth logic — sonnet
+    is capable enough for most of this. Don't reach for T2 just because the domain sounds
+    high-stakes; the domain alone isn't the trigger, see below.
 
-- Core architecture and high-stakes paths → **T2 (Deep)**
-  - Complex system architecture and design phases
-  - Money paths (payments/rewards/auth) and other logic where security and data integrity
-    are non-negotiable
-  - This is the default pick for this band; escalate to **T1 (Flagship)** only when the task
-    is exceptionally complex or ambiguous and T2-level reasoning isn't enough
+- Escalate to **T2 (Deep)** only when the specific task genuinely needs deeper judgment —
+  **requires approval (see step 3)**
+  - Real system-architecture design decisions: choosing between competing designs, defining
+    a new subsystem's boundaries — not implementing a design that's already decided
+  - Money/auth logic where correctness review needs unusually high rigor (e.g. a new
+    payment/auth flow) — not routine CRUD around an existing one
+
+- Escalate further to **T1 (Flagship)** only if T2-level reasoning genuinely isn't enough —
+  **requires approval (see step 3)**
+  - Novel or ambiguous judgment calls with no clear precedent
 
 Rationale examples: "Locating code is a mechanical task where coverage matters —
-T3 (Standard)"; "Naming a trust system / visual design requires quality judgment —
-T2 (Deep)."
+T3 (Standard)"; "Implementing form validation in the auth module is routine, even though the
+module is auth — T3 (Standard)"; "Designing the trust boundary for a brand-new auth
+provider needs architecture judgment, not just implementation — escalate to T2 (Deep)."
 
 ### 3. Delegate — run subagents
 Spin up workers with the `Agent` tool. The supervisor never edits code directly.
@@ -372,8 +381,9 @@ processing add/edit/stop as well.
            small & one-shot → inline (don't write times_table(n) for "print the 3-times table");
            if unclear, ask "should this be a program?"
            → (2-1) allocate tier only for what remains LLM work, with rationale (trivial=T4,
-            general logic/UI/design implementation=T3, core architecture/money-auth high-stakes
-            paths=T2 (escalate to T1 only if T2-level reasoning isn't enough), respect
+            default for everything else incl. architecture/money-auth implementation=T3;
+            escalate to T2 only for real architecture-design decisions or unusually rigorous
+            money/auth correctness review, T1 only if T2-level reasoning isn't enough; respect
             model-limit ceiling — look up the concrete model per provider in the
             [Model Tier Lookup Table](#model-tiers-provider-agnostic-lookup-table))
             [+ account axis: offload to another account if tokens are low & void-dispatch is
