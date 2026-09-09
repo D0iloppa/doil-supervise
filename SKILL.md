@@ -21,31 +21,28 @@ description: >-
 **Never implement the request directly.** As supervisor, only understand, label, route,
 delegate, and synthesize. Actual analysis and implementation is done by subagents (workers).
 
-## Model Tiers (Provider-Agnostic Lookup Table)
+## Model Tiers (Codex-First Lookup Table)
 
-This skill's routing isn't tied to Claude-specific model names (fable/opus/sonnet/haiku). Use
-the **4 tiers below as a provider-neutral baseline**, and refer to them by **tier name
-(T1/T2/T3/T4) only** everywhere else in this document (2-1 Model Allocation, model-limit,
-etc.). Tier numbers follow flagship order — **T1 is the most capable, numbers descend from
-there** — so a smaller number always means "more capable / more expensive," matching how
-people already talk about "tier 1" as the top tier. Right **before** each `Agent`/`delegate`
-call, look up the concrete model in the table below based on the provider (Claude Code / Codex
-CLI / etc.) the subagent will run on.
+Use the **four tiers below as a provider-neutral baseline**, and refer to them by **tier name
+(T1/T2/T3/T4) only** elsewhere in this document (2-1 Model Allocation, model-limit, etc.).
+Tier numbers follow flagship order — **T1 is the most capable, numbers descend from there** —
+so a smaller number always means "more capable / more expensive." The canonical mapping is
+the Codex/OpenAI column. Right before each `Agent`/`delegate` call, select the concrete model
+for the provider that will run the subagent.
 
-| Tier | Criteria | Claude (Claude Code `Agent`) | Codex (OpenAI Codex CLI) |
-|------|----------|-------------------------------|----------------------------|
-| **T1 · Flagship** | The most demanding reasoning: novel/ambiguous architecture calls, judgment with no clear precedent. Escalate here from T2 only when T2-level reasoning proves insufficient. | `fable` (`claude-fable-5`) | `gpt-5-codex`, reasoning effort `xhigh` |
-| **T2 · Deep** | Escalation only: real architecture design decisions, or money/auth logic needing unusually rigorous correctness review | `opus` (`claude-opus-5`) | `gpt-5-codex`, reasoning effort `high` |
-| **T3 · Standard** | The default for almost everything — core day-to-day logic, UI/design implementation, exploration, and most architecture/money-auth *implementation* | `sonnet` (`claude-sonnet-5`) | `gpt-5-codex`, reasoning effort `medium` |
-| **T4 · Light** | Simple/mechanical, high-volume repetition, low risk | `haiku` (`claude-haiku-4-5-20251001`) | `gpt-5-codex`, reasoning effort `minimal`/`low` |
+| Tier | Criteria | Codex / OpenAI (canonical) | Claude Code (compatibility) |
+|------|----------|-----------------------------|------------------------------|
+| **T1 · Flagship** | The most demanding reasoning: novel/ambiguous architecture calls, judgment with no clear precedent. Escalate here from T2 only when T2-level reasoning proves insufficient. | `gpt-6-astra` | `fable` (`claude-fable-5`) |
+| **T2 · Deep** | Escalation only: real architecture design decisions, or money/auth logic needing unusually rigorous correctness review | `gpt-5.6-sol` | `opus` (`claude-opus-5`) |
+| **T3 · Standard** | The default for almost everything — core day-to-day logic, UI/design implementation, exploration, and most architecture/money-auth *implementation* | `gpt-5.6-terra` | `sonnet` (`claude-sonnet-5`) |
+| **T4 · Light** | Simple/mechanical, high-volume repetition, low risk | `gpt-5.6-luna`; an available mini model may be used as an optional lowest-cost variant for this tier | `haiku` (`claude-haiku-4-5-20251001`) |
 
-- **Claude Code sessions**: the `Agent` tool's `model` parameter only accepts the strings
-  `fable`/`opus`/`sonnet`/`haiku` — once you've picked a tier, pass the Claude-column value
+- **Codex sessions**: use the canonical model ID for the selected tier. `gpt-5.6-luna` is the
+  normal T4 choice; use a mini model only when the environment exposes one and its lower cost
+  is worth the trade-off. Do not assume a mini model ID is available.
+- **Claude Code sessions**: the `Agent` tool's `model` parameter accepts the compatibility
+  values `fable`/`opus`/`sonnet`/`haiku`; once you've picked a tier, pass that column's value
   as-is.
-- **Codex sessions** (e.g. `mcp__void-dispatch__delegate` with `tool_command: 'codex exec'`):
-  tiers are often implemented via reasoning-effort on a single model family (`gpt-5-codex`)
-  rather than distinct model names. The table values are illustrative — verify the actual
-  model/option names against the installed Codex CLI version's config.
 - If a provider renames its models, or a new provider is added, **update only this table** —
   the routing procedure below never needs to change.
 
@@ -158,7 +155,7 @@ and provider-specific concrete model names follow the
   - General business logic, search/exploration, doc cleanup, pattern mirroring
   - Design and UI improvements (T3 handles research through actual code implementation
     end-to-end, to avoid losing context)
-  - Also the default for *implementing* system architecture and money/auth logic — sonnet
+  - Also the default for *implementing* system architecture and money/auth logic — Terra
     is capable enough for most of this. Don't reach for T2 just because the domain sounds
     high-stakes; the domain alone isn't the trigger, see below.
 

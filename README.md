@@ -1,6 +1,7 @@
 # doil-supervise
 
-범용 [Claude Code](https://claude.com/claude-code) 스킬. 요청을 **직접 구현하지 않고**
+Codex/OpenAI 기준의 범용 감독 스킬이며, [Claude Code](https://claude.com/claude-code)에도
+호환된다. 요청을 **직접 구현하지 않고**
 감독(supervisor)으로서 **오케스트레이션**한다: 요청 이해 → 작업을 **표준용어로 명명**
 (terminology grounding) → 하위 과업별 **모델 라우팅**(근거 제시) → 분석·구현을
 **서브에이전트에 위임** → 결과 종합·보고. supervisor-worker 멀티에이전트 패턴.
@@ -51,22 +52,24 @@ cd doil-supervise
 > `:` 콜론 하위커맨드가 아니라 **인자 모드**다(콜론은 플러그인 네임스페이스 전용). 첫 토큰
 > `follow`/`add`/`edit`/`stop`/`status`/`model-limit` 로 분기하고, 없으면 기본 오케스트레이션.
 > `TASK_CONTEXT.md` 가 저장소 루트에 있으면 `follow` 없이도 0단계(이해)에서 항상 먼저 읽는다.
-> tier 번호는 **플래그십 순서**를 따른다 — 숫자가 작을수록 상위(더 강력한) 모델이다
-> (T1=fable, T2=opus, T3=sonnet, T4=haiku). **T3(표준)가 아키텍처·머니/인증 구현을 포함해
+> tier 번호는 **플래그십 순서**를 따른다 — 숫자가 작을수록 상위(더 강력한) 모델이다.
+> Codex/OpenAI의 기본 매핑은 **T1=Astra** (`gpt-6-astra`), **T2=Sol** (`gpt-5.6-sol`),
+> **T3=Terra** (`gpt-5.6-terra`), **T4=Luna** (`gpt-5.6-luna`)다. mini 모델은 환경에
+> 실제로 제공될 때만 T4의 선택적 최저비용 변형으로 쓴다. **T3(표준)가 아키텍처·머니/인증 구현을 포함해
 > 대부분의 기본값**이고, **T2(심층) 이상**(T1·T2)은 "실제 아키텍처 설계 판단"이나 "이례적으로
 > 엄격한 정합성 검토가 필요한 머니/인증 로직"처럼 근거가 뚜렷할 때만 에스컬레이션한다 — 도메인이
 > 머니/인증이라는 사실만으로 자동으로 T2가 되지 않는다. T2 이상은 근거 제시와 별개로 **사용자의
 > 명시적 승인**이 와야 위임을 실행한다 — 감독이 스스로 승인 처리하고 자동 진행하지 않는다.
-> tier(T1/T2/T3/T4)와 provider별(Claude/Codex) 구체 모델명은
-> [`SKILL.md`의 모델 티어 조견표](SKILL.md#model-tiers-provider-agnostic-lookup-table) 참고.
+> tier(T1/T2/T3/T4)와 provider별 구체 모델명은
+> [`SKILL.md`의 Codex 우선 모델 티어 조견표](SKILL.md#model-tiers-codex-first-lookup-table) 참고.
 
 예) `/doil-supervise 동네지도 포스트패널에 무한스크롤 붙여줘`
 → 감독이 "이 작업은 *pagination(무한스크롤) 도입* 작업입니다"라 명명하고, 탐색·구현 모두
-T3(표준, Claude 기준 sonnet) 로 라우팅해(에스컬레이션 근거 없음, 승인 불필요) 서브에이전트에
+T3(표준, Codex 기준 Terra) 로 라우팅해(에스컬레이션 근거 없음, 승인 불필요) 서브에이전트에
 위임한 뒤 결과를 종합 보고한다.
 
 예) 위 작업이 도는 중에 `/doil-supervise add 로딩 스켈레톤도 넣어줘`
-→ 기존 워커는 두고, 스켈레톤 UI 워커(T3, Claude 기준 sonnet)를 추가 투입한다.
+→ 기존 워커는 두고, 스켈레톤 UI 워커(T3, Codex 기준 Terra)를 추가 투입한다.
 
 ## 선택 요구사항 (optional requirements)
 
