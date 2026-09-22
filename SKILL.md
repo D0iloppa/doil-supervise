@@ -178,6 +178,25 @@ provider needs architecture judgment, not just implementation — escalate to T2
 ### 3. Delegate — run subagents
 Spin up workers with the `Agent` tool. The supervisor never edits code directly.
 
+- **Fork ("Seed AI") vs. a fresh `Agent`.** `subagent_type: "fork"` inherits the supervisor's
+  full conversation context and shares its prompt cache, so it's cheaper — but a fork **always
+  runs on the supervisor's own model and ignores any `model` override** (there's no way to
+  switch a fork's model mid-run). Because of that, fork is **not** a general cost-saving
+  substitute for tiered routing — it's reserved for subtasks where **carrying over the parent's
+  conversation context is itself the point**, regardless of which tier the subtask would
+  otherwise get:
+  - Genuine continuations of something already discussed in this session (e.g. a follow-up
+    investigation, "keep going on X" work) where re-explaining context to a fresh agent would
+    cost more than it saves.
+  - NOT a blanket default — for everything else (a fresh independent analysis/implementation
+    subtask with no dependency on the parent's conversation history), route by tier as usual
+    (2-1) and launch a normal `Agent` with the tier's `model` value. Don't fork a subtask just
+    because its tier happens to match the supervisor's own model — that's an unrelated
+    coincidence, not "context sharing matters."
+  - When forking, still state the tier/model rationale for the record, but note explicitly
+    that the model is inherited from the parent (not independently selected) and why context
+    sharing justified using fork over a tier-routed `Agent` call.
+
 - **Before delegating, write task_context first (or update the existing one)** — capture the
   original request, assumptions, the terminology label, the routing plan, and the worker
   list/status. This lets the next session pick up even if this one is cut off. Reflect it
@@ -387,8 +406,10 @@ processing add/edit/stop as well.
             available]
 4) Delegate → write task_context (main ticket, workers = sub-tickets) → pin /goal → [if T2 or
            more capable (T1/T2) is assigned, wait for approval via AskUserQuestion — never
-           delegate before the reply arrives] → Agent(analysis, codebase-memory MCP first) →
-           [read it] → Agent(implementation) [→ reviewer]
+           delegate before the reply arrives] → fork ("Seed AI") only when carrying over this
+           session's context is the point (model is inherited, not chosen); otherwise
+           Agent(analysis, codebase-memory MCP first, tier's model) → [read it] →
+           Agent(implementation) [→ reviewer]
            [if tokens are low & void-dispatch is available, run delegate(profile,prompt)
            headlessly on another account]
 5) Synthesize → report results/verification status truthfully → update task_context → /goal
