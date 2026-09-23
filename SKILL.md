@@ -178,24 +178,62 @@ provider needs architecture judgment, not just implementation — escalate to T2
 ### 3. Delegate — run subagents
 Spin up workers with the `Agent` tool. The supervisor never edits code directly.
 
-- **Fork ("Seed AI") vs. a fresh `Agent`.** `subagent_type: "fork"` inherits the supervisor's
-  full conversation context and shares its prompt cache, so it's cheaper — but a fork **always
-  runs on the supervisor's own model and ignores any `model` override** (there's no way to
-  switch a fork's model mid-run). Because of that, fork is **not** a general cost-saving
-  substitute for tiered routing — it's reserved for subtasks where **carrying over the parent's
-  conversation context is itself the point**, regardless of which tier the subtask would
-  otherwise get:
-  - Genuine continuations of something already discussed in this session (e.g. a follow-up
-    investigation, "keep going on X" work) where re-explaining context to a fresh agent would
-    cost more than it saves.
-  - NOT a blanket default — for everything else (a fresh independent analysis/implementation
-    subtask with no dependency on the parent's conversation history), route by tier as usual
-    (2-1) and launch a normal `Agent` with the tier's `model` value. Don't fork a subtask just
-    because its tier happens to match the supervisor's own model — that's an unrelated
-    coincidence, not "context sharing matters."
-  - When forking, still state the tier/model rationale for the record, but note explicitly
-    that the model is inherited from the parent (not independently selected) and why context
-    sharing justified using fork over a tier-routed `Agent` call.
+- **Context economics — keep context, skip redundant init.** The goal is cost optimization
+  *without* giving up context. Cost is not just token price: it's token cost **plus rework
+  cost** — a worker that misjudges because it lacked context triggers review → redo loops,
+  which usually cost more than the context would have. So never trade context away just to
+  hit a cheaper tier; instead, spend context only where it's actually needed.
+  - **Split judgment from execution.** Most subtasks have two parts:
+    - *Context-heavy judgment* — what to do, under which constraints, which approach. Few
+      tokens, high dependence on this session's context. Do it where the context lives: the
+      supervisor itself (or a fork).
+    - *Token-heavy execution* — writing code, bulk edits, collecting sources. Many tokens,
+      but needs almost no session context **if the spec is good**. Send it to the tier's
+      (cheaper) model via a normal `Agent`.
+    - The interface between them is a **self-contained spec**: goal condition, exact file
+      paths, constraints and decisions already made, alternatives already rejected (and why),
+      conventions to follow, and the report format (below). A worker holding a good spec
+      loses no meaningful context. Only when the needed context genuinely can't be written
+      into a spec does a fork carry the execution end-to-end.
+  - **Fork ("Seed AI") = the supervisor at a chosen moment.** `subagent_type: "fork"`
+    inherits the supervisor's full conversation and shares its prompt cache, so it skips init
+    entirely — but it **always runs on the supervisor's own model and ignores any `model`
+    override**. A fork can only clone the calling session; you cannot fork a previously
+    spawned subagent, and forks must not re-delegate. So the "representative agent" to clone
+    is the supervisor itself.
+    - **Pick the seed point deliberately:** fork right after understanding → exploration →
+      planning are done, when context is richest and noise is lowest. Forking after you've
+      started reading worker results copies that noise into every clone.
+    - **Parallel fan-out:** when several subtasks all need this session's context and can't
+      be spec'd out, launch N forks from the same seed point **in one message** — each gets
+      the full context with no per-worker injection. Here the tier-mismatch concern is
+      secondary: the model is fixed anyway, and context fidelity is the point.
+    - **Cost guard:** a fork re-reads the whole (cached) context on every tool turn. If
+      `session context size × expected worker turns` is large (very long session + long
+      execution), cached reads on the supervisor's model can exceed a fresh cheaper worker —
+      try spec'ing it out once more before forking.
+    - **Approval:** a fork inherits the supervisor's model, so if that model is T2 or more
+      capable, the T2+ approval rule below applies — ask once for the whole fork fan-out
+      (state N and the inherited model), not per fork.
+    - When forking, still state the tier rationale for the record, noting that the model is
+      inherited, not selected, and why the context couldn't be spec'd.
+  - **Routing rule (deterministic, apply in order):**
+    ```
+    context dependence low                          → Agent(tier model)
+    context dependence high + spec-able             → supervisor writes spec → Agent(tier model)
+    context dependence high + not spec-able         → fork (×N in parallel from one seed point)
+    fork cost guard exceeded                        → retry spec'ing before forking
+    ```
+  - **Workers return compressed, structured reports — never raw dumps.** The supervisor's
+    context is a shared asset: every later fork inherits it, and every review reads it.
+    Require each worker (fork or `Agent`) to end with exactly: **changes** (files + one-line
+    what/why), **decisions made**, **verification** (what was run, pass/fail), **open
+    issues**. No full file contents, no long logs unless asked. Put this format into every
+    spec/prompt.
+  - **Measure, then tune.** Record per worker in its task_context sub-ticket: mode
+    (fork / spec→Agent / Agent), model, reported usage if available, and whether rework was
+    needed. The cost-guard threshold starts as an estimate; adjust it from these records
+    rather than by feel.
 
 - **Before delegating, write task_context first (or update the existing one)** — capture the
   original request, assumptions, the terminology label, the routing plan, and the worker
@@ -238,9 +276,10 @@ Spin up workers with the `Agent` tool. The supervisor never edits code directly.
   forbids T1/T2 and allows T3/T4). If you judge the task genuinely needs to exceed the
   ceiling, don't silently upgrade or ignore it during routing — ask the user first whether
   to raise the ceiling.
-- **Explicitly instruct tool/context usage in the prompt.** Subagents don't inherit the
-  parent's context — spell out the file paths needed, "follow the CLAUDE.md conventions,"
-  etc. directly in the prompt.
+- **Explicitly instruct tool/context usage in the prompt.** Non-fork subagents don't inherit
+  the parent's context — the prompt *is* the self-contained spec: spell out the file paths
+  needed, "follow the CLAUDE.md conventions," decisions already made, and the structured
+  report format directly in the prompt.
 - **When session tokens are low — cross-account offload.** If `mcp__void-dispatch__*` tools
   are exposed (see [optional requirements](#optional-requirements) for how to check
   installation), you can **delegate to a different account profile** instead of spinning the
@@ -406,10 +445,12 @@ processing add/edit/stop as well.
             available]
 4) Delegate → write task_context (main ticket, workers = sub-tickets) → pin /goal → [if T2 or
            more capable (T1/T2) is assigned, wait for approval via AskUserQuestion — never
-           delegate before the reply arrives] → fork ("Seed AI") only when carrying over this
-           session's context is the point (model is inherited, not chosen); otherwise
-           Agent(analysis, codebase-memory MCP first, tier's model) → [read it] →
-           Agent(implementation) [→ reviewer]
+           delegate before the reply arrives] → judgment stays with the supervisor, execution
+           goes out via a self-contained spec: context low → Agent(tier model); context high
+           & spec-able → spec → Agent(tier model); context high & not spec-able → fork ×N from
+           one seed point (model inherited; cost guard); Agent(analysis, codebase-memory MCP
+           first) → [read it] → Agent(implementation) [→ reviewer]; every worker returns a
+           structured report (changes / decisions / verification / open issues)
            [if tokens are low & void-dispatch is available, run delegate(profile,prompt)
            headlessly on another account]
 5) Synthesize → report results/verification status truthfully → update task_context → /goal
